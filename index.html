@@ -1,0 +1,1000 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Practice Desk</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>\U0001F4D8</text></svg>" />
+<script src="https://cdn.tailwindcss.com"></script>
+<script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<style> body { margin: 0; } </style>
+</head>
+<body>
+<div id="root" style="min-height:100vh;display:flex;align-items:center;justify-content:center;color:#94a3b8;font-family:system-ui">Loading…</div>
+<script type="text/babel" data-presets="react">
+
+const { useState, useEffect, useMemo } = React;
+
+/* ---- persistence: localStorage shim mirroring the prototype API ---- */
+window.storage = {
+  async get(key){ const v = localStorage.getItem(key); return v === null ? null : { key, value: v, shared: false }; },
+  async set(key, value){ localStorage.setItem(key, value); return { key, value, shared: false }; },
+  async delete(key){ localStorage.removeItem(key); return { key, deleted: true }; },
+  async list(prefix=''){ const keys=[]; for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i); if(k.startsWith(prefix)) keys.push(k);} return { keys, prefix }; },
+};
+
+/* ---- lightweight icon set (replaces lucide-react, no bundler needed) ---- */
+function Svg({ size = 16, className = '', children, ...rest }) {
+  return React.createElement('svg', { width: size, height: size, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round', className, ...rest }, children);
+}
+const mk = (paths) => ({ size, className, ...rest }) =>
+  React.createElement(Svg, { size, className, ...rest }, paths.map((p, i) => React.createElement(p[0], { key: i, ...p[1] })));
+
+const LayoutDashboard = mk([['rect',{x:3,y:3,width:7,height:9,rx:1}],['rect',{x:14,y:3,width:7,height:5,rx:1}],['rect',{x:14,y:12,width:7,height:9,rx:1}],['rect',{x:3,y:16,width:7,height:5,rx:1}]]);
+const CalendarDays = mk([['rect',{x:3,y:4,width:18,height:18,rx:2}],['line',{x1:3,y1:10,x2:21,y2:10}],['line',{x1:8,y1:2,x2:8,y2:6}],['line',{x1:16,y1:2,x2:16,y2:6}]]);
+const ListChecks = mk([['path',{d:'M3 6h11'}],['path',{d:'M3 12h11'}],['path',{d:'M3 18h11'}],['path',{d:'M16 6l2 2 4-4'}]]);
+const Building2 = mk([['rect',{x:6,y:3,width:12,height:18,rx:1}],['line',{x1:10,y1:7,x2:10,y2:7}],['line',{x1:14,y1:7,x2:14,y2:7}],['line',{x1:10,y1:11,x2:10,y2:11}],['line',{x1:14,y1:11,x2:14,y2:11}]]);
+const Users = mk([['path',{d:'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2'}],['circle',{cx:9,cy:7,r:4}],['path',{d:'M22 21v-2a4 4 0 0 0-3-3.87'}]]);
+const Bell = mk([['path',{d:'M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9'}],['path',{d:'M13.7 21a2 2 0 0 1-3.4 0'}]]);
+const BellRing = mk([['path',{d:'M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9'}],['path',{d:'M13.7 21a2 2 0 0 1-3.4 0'}],['path',{d:'M2 8c0-2 .7-3.7 2-5'}],['path',{d:'M22 8c0-2-.7-3.7-2-5'}]]);
+const Plus = mk([['line',{x1:12,y1:5,x2:12,y2:19}],['line',{x1:5,y1:12,x2:19,y2:12}]]);
+const Trash2 = mk([['polyline',{points:'3 6 5 6 21 6'}],['path',{d:'M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6'}],['path',{d:'M10 11v6'}],['path',{d:'M14 11v6'}],['path',{d:'M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2'}]]);
+const Pencil = mk([['path',{d:'M12 20h9'}],['path',{d:'M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z'}]]);
+const X = mk([['line',{x1:18,y1:6,x2:6,y2:18}],['line',{x1:6,y1:6,x2:18,y2:18}]]);
+const ChevronLeft = mk([['polyline',{points:'15 18 9 12 15 6'}]]);
+const ChevronRight = mk([['polyline',{points:'9 18 15 12 9 6'}]]);
+const AlertTriangle = mk([['path',{d:'M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z'}],['line',{x1:12,y1:9,x2:12,y2:13}],['line',{x1:12,y1:17,x2:12,y2:17}]]);
+const Clock = mk([['circle',{cx:12,cy:12,r:9}],['polyline',{points:'12 7 12 12 15 14'}]]);
+const CheckCircle2 = mk([['circle',{cx:12,cy:12,r:9}],['path',{d:'M8 12l3 3 5-6'}]]);
+const RotateCcw = mk([['polyline',{points:'1 4 1 10 7 10'}],['path',{d:'M3.51 15a9 9 0 1 0 2.13-9.36L1 10'}]]);
+const Eye = mk([['path',{d:'M2 12s4-7 10-7 10 7 10 7-4 7-10 7-10-7-10-7Z'}],['circle',{cx:12,cy:12,r:3}]]);
+const SettingsIcon = mk([['circle',{cx:12,cy:12,r:3}],['path',{d:'M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-2.81 1.17V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 8 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15H4.5a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 6 9.4a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 11 4.6V4.5a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 2.81 1.17l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z'}]]);
+const Tags = mk([['path',{d:'M9 5H5a2 2 0 0 0-2 2v4l9 9 6-6-9-9Z'}],['circle',{cx:7.5,cy:9.5,r:1}],['path',{d:'M14 4l7 7-2 2'}]]);
+const Layers = mk([['polygon',{points:'12 2 2 7 12 12 22 7 12 2'}],['polyline',{points:'2 17 12 22 22 17'}],['polyline',{points:'2 12 12 17 22 12'}]]);
+const Upload = mk([['path',{d:'M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4'}],['polyline',{points:'17 8 12 3 7 8'}],['line',{x1:12,y1:3,x2:12,y2:15}]]);
+const CheckSquare = mk([['polyline',{points:'9 11 12 14 20 5'}],['path',{d:'M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h11'}]]);
+const Square = mk([['rect',{x:4,y:4,width:16,height:16,rx:2}]]);
+
+
+/* ------------------------------------------------------------------ */
+/*  Helpers                                                            */
+/* ------------------------------------------------------------------ */
+const uid = () => Math.random().toString(36).slice(2, 9);
+const pad = (n) => String(n).padStart(2, "0");
+const toISO = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+const today = () => { const d = new Date(); d.setHours(0, 0, 0, 0); return d; };
+const parse = (iso) => { const [y, m, d] = iso.split("-").map(Number); return new Date(y, m - 1, d); };
+const daysUntil = (iso) => Math.round((parse(iso) - today()) / 86400000);
+const fmt = (iso) => parse(iso).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+
+/* parse common Indian date inputs for bulk import */
+const importDate = (s) => {
+  s = (s || "").trim();
+  if (/^\d{4}-\d{1,2}-\d{1,2}$/.test(s)) { const [y,m,d]=s.split("-").map(Number); return `${y}-${pad(m)}-${pad(d)}`; }
+  const m = s.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})$/);
+  if (m) return `${m[3]}-${pad(+m[2])}-${pad(+m[1])}`;
+  return null;
+};
+
+const STATUS = ["Pending", "In Progress", "Completed"];
+
+const urgency = (t) => {
+  if (t.status === "Completed") return "completed";
+  const d = daysUntil(t.due);
+  if (d < 0) return "overdue";
+  if (d <= 7) return "due-soon";
+  return "upcoming";
+};
+
+const U = {
+  "overdue":   { label: "Overdue",      dot: "bg-rose-400",    chip: "bg-rose-50 text-rose-700 border-rose-200" },
+  "due-soon":  { label: "Due in 7 days",dot: "bg-amber-400",   chip: "bg-amber-50 text-amber-700 border-amber-200" },
+  "upcoming":  { label: "Upcoming",     dot: "bg-sky-400",     chip: "bg-sky-50 text-sky-700 border-sky-200" },
+  "completed": { label: "Completed",    dot: "bg-emerald-400", chip: "bg-emerald-50 text-emerald-700 border-emerald-200" },
+};
+
+const CTYPE = {
+  "GST":              "bg-violet-50 text-violet-700 border-violet-200",
+  "TDS":              "bg-cyan-50 text-cyan-700 border-cyan-200",
+  "Income Tax":       "bg-blue-50 text-blue-700 border-blue-200",
+  "ROC":              "bg-fuchsia-50 text-fuchsia-700 border-fuchsia-200",
+  "FEMA":             "bg-teal-50 text-teal-700 border-teal-200",
+  "Transfer Pricing": "bg-pink-50 text-pink-700 border-pink-200",
+};
+const PALETTE = [
+  "bg-violet-50 text-violet-700 border-violet-200","bg-cyan-50 text-cyan-700 border-cyan-200",
+  "bg-blue-50 text-blue-700 border-blue-200","bg-fuchsia-50 text-fuchsia-700 border-fuchsia-200",
+  "bg-teal-50 text-teal-700 border-teal-200","bg-pink-50 text-pink-700 border-pink-200",
+  "bg-lime-50 text-lime-700 border-lime-200","bg-orange-50 text-orange-700 border-orange-200",
+];
+const colorFor = (area) => {
+  if (!area) return "bg-slate-100 text-slate-600 border-slate-200";
+  if (CTYPE[area]) return CTYPE[area];
+  let h = 0; for (let i = 0; i < area.length; i++) h = (h * 31 + area.charCodeAt(i)) >>> 0;
+  return PALETTE[h % PALETTE.length];
+};
+
+const STATUS_STYLE = {
+  "Pending":     "bg-slate-100 text-slate-600 border-slate-200",
+  "In Progress": "bg-indigo-50 text-indigo-700 border-indigo-200",
+  "Completed":   "bg-emerald-50 text-emerald-700 border-emerald-200",
+};
+
+const DEFAULT_SETTINGS = {
+  firmName: "SVRJ & Co LLP",
+  complianceAreas: ["GST", "TDS", "Income Tax", "ROC", "FEMA", "Transfer Pricing"],
+  reminderDays: [7, 3, 1],
+  remindOnDueDate: true,
+  remindOverdue: true,
+};
+
+/* ------------------------------------------------------------------ */
+/*  Seed data (sample — fully editable)                                */
+/* ------------------------------------------------------------------ */
+const seed = () => {
+  const y = today().getFullYear();
+  const m = today().getMonth() + 1;
+  const iso = (mm, dd) => `${y}-${pad(mm)}-${pad(dd)}`;
+  const staff = [
+    { id: "admin", name: "Vishal Bhandari", role: "Admin" },
+    { id: "s1", name: "Priya", role: "Staff" },
+    { id: "s2", name: "Arjun", role: "Staff" },
+    { id: "s3", name: "Sneha", role: "Staff" },
+    { id: "s4", name: "Rahul", role: "Staff" },
+  ];
+  const clients = [
+    { id: "c1", name: "ABC India Pvt Ltd", type: "Pvt Ltd", staffId: "s1", status: "Active" },
+    { id: "c2", name: "XYZ UK India Subsidiary", type: "Foreign Subsidiary", staffId: "s2", status: "Active" },
+    { id: "c3", name: "DEF Trading LLP", type: "LLP", staffId: "s3", status: "Active" },
+    { id: "c4", name: "GHI Pharma Pvt Ltd", type: "Pvt Ltd", staffId: "s4", status: "Active" },
+  ];
+  const masters = [
+    { id: "m1", title: "GSTR-3B filing", compliance: "GST" },
+    { id: "m2", title: "GSTR-1 filing", compliance: "GST" },
+    { id: "m3", title: "GSTR-9 annual return", compliance: "GST" },
+    { id: "m4", title: "TDS 26Q return", compliance: "TDS" },
+    { id: "m5", title: "TDS 24Q return", compliance: "TDS" },
+    { id: "m6", title: "Advance Tax", compliance: "Income Tax" },
+    { id: "m7", title: "AOC-4 filing", compliance: "ROC" },
+    { id: "m8", title: "MSME-1", compliance: "ROC" },
+    { id: "m9", title: "FC-GPR reporting", compliance: "FEMA" },
+    { id: "m10", title: "Form 3CEB", compliance: "Transfer Pricing" },
+  ];
+  const tasks = [
+    /* same master (GSTR-3B) across three companies, three people */
+    { id: uid(), masterId: "m1", clientId: "c1", staffId: "s1", due: iso(m, 20), status: "Pending" },
+    { id: uid(), masterId: "m1", clientId: "c3", staffId: "s3", due: iso(m, 20), status: "Pending" },
+    { id: uid(), masterId: "m1", clientId: "c4", staffId: "s4", due: iso(m, 20), status: "In Progress" },
+    { id: uid(), masterId: "m2", clientId: "c1", staffId: "s1", due: iso(m, 11), status: "Pending" },
+    { id: uid(), masterId: "m6", clientId: "c1", staffId: "s1", due: iso(m, 15), status: "Pending" },
+    { id: uid(), masterId: "m4", clientId: "c2", staffId: "s2", due: iso(m, 1), status: "Pending" },
+    { id: uid(), masterId: "m10", clientId: "c2", staffId: "s2", due: iso(10, 31), status: "Pending" },
+    { id: uid(), masterId: "m7", clientId: "c3", staffId: "s3", due: iso(m, 15), status: "In Progress" },
+    { id: uid(), masterId: "m3", clientId: "c3", staffId: "s3", due: iso(12, 31), status: "Pending" },
+    { id: uid(), masterId: "m9", clientId: "c4", staffId: "s4", due: iso(m, 8), status: "Pending" },
+    { id: uid(), masterId: "m8", clientId: "c4", staffId: "s3", due: iso(4, 30), status: "Completed" },
+    { id: uid(), masterId: "m5", clientId: "c1", staffId: "s1", due: iso(m, 1), status: "Completed" },
+  ];
+  return { staff, clients, masters, tasks, settings: { ...DEFAULT_SETTINGS }, seeded: true };
+};
+
+/* Backfill structure for data saved by older versions */
+const normalize = (d) => {
+  d.settings = { ...DEFAULT_SETTINGS, ...(d.settings || {}) };
+  const s = d.settings;
+  if (!Array.isArray(s.complianceAreas) || !s.complianceAreas.length) s.complianceAreas = [...DEFAULT_SETTINGS.complianceAreas];
+  if (!Array.isArray(s.reminderDays)) s.reminderDays = [...DEFAULT_SETTINGS.reminderDays];
+  if (!Array.isArray(d.masters)) d.masters = [];
+
+  const findOrAddMaster = (title, compliance) => {
+    let m = d.masters.find((x) => x.title === title && x.compliance === compliance);
+    if (!m) { m = { id: uid(), title, compliance }; d.masters.push(m); }
+    return m.id;
+  };
+  // migrate any legacy templates
+  if (s.taskTemplates && Array.isArray(s.taskTemplates)) {
+    s.taskTemplates.forEach((t) => findOrAddMaster(t.title, t.compliance));
+    delete s.taskTemplates;
+  }
+  // migrate legacy denormalised tasks (title + compliance on the task)
+  d.tasks = (d.tasks || []).map((t) => {
+    if (t.masterId && d.masters.some((m) => m.id === t.masterId)) return t;
+    const title = t.title || "Task";
+    const compliance = t.compliance || s.complianceAreas[0] || "GST";
+    const masterId = findOrAddMaster(title, compliance);
+    const { title: _t, compliance: _c, ...rest } = t;
+    return { ...rest, masterId };
+  });
+  return d;
+};
+
+const KEY = "practice-desk-v1";
+
+/* ------------------------------------------------------------------ */
+/*  UI atoms                                                           */
+/* ------------------------------------------------------------------ */
+const Chip = ({ cls, children }) => (
+  <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium ${cls}`}>{children}</span>
+);
+const Card = ({ children, className = "" }) => (
+  <div className={`rounded-2xl border border-slate-200 bg-white shadow-sm ${className}`}>{children}</div>
+);
+const inputCls = "w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-200";
+const Field = ({ label, children }) => (
+  <label className="block"><span className="mb-1 block text-xs font-medium text-slate-500">{label}</span>{children}</label>
+);
+
+/* ------------------------------------------------------------------ */
+/*  Main                                                               */
+/* ------------------------------------------------------------------ */
+function PracticeDesk() {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [userId, setUserId] = useState("admin");
+  const [tab, setTab] = useState("dashboard");
+  const [showNotif, setShowNotif] = useState(false);
+  const [modal, setModal] = useState(null); // {type, payload}
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const r = await window.storage.get(KEY, true);
+        setData(r && r.value ? normalize(JSON.parse(r.value)) : seed());
+      } catch {
+        const sd = seed();
+        try { await window.storage.set(KEY, JSON.stringify(sd), true); } catch {}
+        setData(sd);
+      } finally { setLoading(false); }
+    })();
+  }, []);
+
+  const save = async (next) => {
+    setData(next);
+    try { await window.storage.set(KEY, JSON.stringify(next), true); } catch {}
+  };
+  const reset = async () => { const sd = seed(); await save(sd); setUserId("admin"); setTab("dashboard"); };
+
+  const me = data?.staff.find((s) => s.id === userId);
+  const isAdmin = me?.role === "Admin";
+  const staffName = (id) => data?.staff.find((s) => s.id === id)?.name || "Unassigned";
+  const clientName = (id) => data?.clients.find((c) => c.id === id)?.name || "—";
+  const master = (id) => data?.masters.find((m) => m.id === id);
+  const titleOf = (t) => master(t.masterId)?.title || "—";
+  const areaOf = (t) => master(t.masterId)?.compliance || "";
+
+  const visibleTasks = useMemo(() => {
+    if (!data) return [];
+    return isAdmin ? data.tasks : data.tasks.filter((t) => t.staffId === userId);
+  }, [data, isAdmin, userId]);
+
+  const alerts = useMemo(() => {
+    if (!data) return [];
+    const s = data.settings;
+    const lead = s.reminderDays.length ? Math.max(...s.reminderDays) : 0;
+    return visibleTasks.filter((t) => {
+      if (t.status === "Completed") return false;
+      const d = daysUntil(t.due);
+      if (d < 0) return s.remindOverdue;
+      if (d === 0) return s.remindOnDueDate;
+      return d <= lead;
+    }).sort((a, b) => daysUntil(a.due) - daysUntil(b.due));
+  }, [data, visibleTasks]);
+
+  if (loading || !data) {
+    return <div className="flex min-h-screen items-center justify-center bg-gradient-to-b from-indigo-50 to-slate-50 text-slate-500">Loading your workspace…</div>;
+  }
+
+  /* mutations */
+  const addTasks = (rows) => save({ ...data, tasks: [...data.tasks, ...rows.map((r) => ({ ...r, id: uid() }))] });
+  const updateTask = (t) => save({ ...data, tasks: data.tasks.map((x) => (x.id === t.id ? t : x)) });
+  const delTask = (id) => save({ ...data, tasks: data.tasks.filter((t) => t.id !== id) });
+  const cycleStatus = (t) => {
+    const i = STATUS.indexOf(t.status);
+    updateTask({ ...t, status: STATUS[(i + 1) % STATUS.length] });
+  };
+  const applyBulk = (newMasters, finalTasks) => save({ ...data, masters: [...data.masters, ...newMasters], tasks: finalTasks });
+
+  const upsertClient = (c) => {
+    const clients = data.clients.some((x) => x.id === c.id)
+      ? data.clients.map((x) => (x.id === c.id ? c : x)) : [...data.clients, { ...c, id: uid() }];
+    save({ ...data, clients });
+  };
+  const delClient = (id) => save({ ...data, clients: data.clients.filter((c) => c.id !== id) });
+
+  const ctx = { data, isAdmin, me, userId, staffName, clientName, master, titleOf, areaOf, visibleTasks, setModal, setTab };
+
+  const NAV = [
+    { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
+    { id: "calendar", label: "Calendar", icon: CalendarDays },
+    { id: "tasks", label: "Tasks", icon: ListChecks },
+    { id: "clients", label: "Clients", icon: Building2 },
+    ...(isAdmin ? [{ id: "team", label: "Team", icon: Users }, { id: "settings", label: "Settings", icon: SettingsIcon }] : []),
+  ];
+
+  return (
+    <div className="min-h-screen bg-gradient-to-b from-indigo-50 to-slate-50 font-sans text-slate-700">
+      <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/80 backdrop-blur">
+        <div className="mx-auto flex max-w-6xl items-center gap-3 px-4 py-3">
+          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-500 text-white shadow-sm"><LayoutDashboard size={18} /></div>
+          <div className="mr-auto leading-tight">
+            <div className="text-sm font-semibold text-slate-800">Practice Desk</div>
+            <div className="text-xs text-slate-400">{data.settings.firmName} · internal</div>
+          </div>
+          <div className="relative">
+            <button onClick={() => setShowNotif((v) => !v)} className="relative rounded-xl border border-slate-200 bg-white p-2 text-slate-500 hover:bg-slate-50" aria-label="Notifications">
+              <Bell size={18} />
+              {alerts.length > 0 && <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-rose-400 px-1 text-[10px] font-semibold text-white">{alerts.length}</span>}
+            </button>
+            {showNotif && (
+              <div className="absolute right-0 mt-2 w-72 rounded-2xl border border-slate-200 bg-white p-2 shadow-lg">
+                <div className="px-2 py-1 text-xs font-semibold text-slate-500">Reminders</div>
+                {alerts.length === 0 && <div className="px-2 py-3 text-sm text-slate-400">Nothing due in the reminder window.</div>}
+                {alerts.slice(0, 8).map((t) => {
+                  const d = daysUntil(t.due);
+                  return (
+                    <div key={t.id} className="flex items-start gap-2 rounded-xl px-2 py-2 hover:bg-slate-50">
+                      <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${U[urgency(t)].dot}`} />
+                      <div className="text-sm">
+                        <div className="font-medium text-slate-700">{titleOf(t)} · {clientName(t.clientId)}</div>
+                        <div className="text-xs text-slate-400">{d < 0 ? `Overdue by ${-d}d` : d === 0 ? "Due today" : `Due in ${d}d`} · {staffName(t.staffId)}</div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+          <select value={userId} onChange={(e) => { setUserId(e.target.value); setTab("dashboard"); setShowNotif(false); }}
+            className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-200"
+            title="Prototype role switch — stands in for separate staff logins">
+            {data.staff.map((s) => <option key={s.id} value={s.id}>{s.name} — {s.role}</option>)}
+          </select>
+        </div>
+        <nav className="mx-auto flex max-w-6xl gap-1 overflow-x-auto px-2 pb-2">
+          {NAV.map((n) => {
+            const Icon = n.icon; const active = tab === n.id;
+            return (
+              <button key={n.id} onClick={() => setTab(n.id)}
+                className={`flex items-center gap-1.5 whitespace-nowrap rounded-xl px-3 py-1.5 text-sm font-medium transition ${active ? "bg-indigo-500 text-white shadow-sm" : "text-slate-500 hover:bg-slate-100"}`}>
+                <Icon size={15} /> {n.label}
+              </button>
+            );
+          })}
+        </nav>
+      </header>
+
+      <main className="mx-auto max-w-6xl px-4 py-6">
+        {tab === "dashboard" && <Dashboard {...ctx} />}
+        {tab === "calendar" && <Calendar {...ctx} />}
+        {tab === "tasks" && <Tasks {...ctx} cycleStatus={cycleStatus} delTask={delTask} />}
+        {tab === "clients" && <Clients {...ctx} delClient={delClient} />}
+        {tab === "team" && isAdmin && <Team data={data} save={save} />}
+        {tab === "settings" && isAdmin && <SettingsPanel data={data} save={save} />}
+
+        <div className="mt-8 flex items-center justify-between border-t border-slate-200 pt-4 text-xs text-slate-400">
+          <span>Prototype · sample data is fully editable</span>
+          <button onClick={reset} className="inline-flex items-center gap-1 rounded-lg px-2 py-1 hover:bg-slate-100 hover:text-slate-600"><RotateCcw size={13} /> Reset sample data</button>
+        </div>
+      </main>
+
+      {modal?.type === "assign" && <AssignModal data={data} task={modal.payload} onAdd={addTasks} onUpdate={updateTask} onClose={() => setModal(null)} />}
+      {modal?.type === "bulk" && <BulkImport data={data} onApply={applyBulk} onClose={() => setModal(null)} />}
+      {modal?.type === "master" && <MasterModal data={data} master={modal.payload} save={save} onClose={() => setModal(null)} />}
+      {modal?.type === "client" && <ClientModal data={data} client={modal.payload} onSave={(c) => { upsertClient(c); setModal(null); }} onClose={() => setModal(null)} />}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Dashboard                                                          */
+/* ------------------------------------------------------------------ */
+function Dashboard({ isAdmin, me, data, visibleTasks, clientName, staffName, titleOf, areaOf, setTab }) {
+  const open = visibleTasks.filter((t) => t.status !== "Completed");
+  const overdue = open.filter((t) => daysUntil(t.due) < 0);
+  const dueSoon = open.filter((t) => daysUntil(t.due) >= 0 && daysUntil(t.due) <= 7);
+  const activeClients = isAdmin ? data.clients.filter((c) => c.status === "Active").length : data.clients.filter((c) => c.staffId === me.id).length;
+  const stats = [
+    { label: isAdmin ? "Active clients" : "My clients", val: activeClients, cls: "bg-indigo-50 text-indigo-700", icon: Building2 },
+    { label: "Open tasks", val: open.length, cls: "bg-sky-50 text-sky-700", icon: ListChecks },
+    { label: "Overdue", val: overdue.length, cls: "bg-rose-50 text-rose-700", icon: AlertTriangle },
+    { label: "Due in 7 days", val: dueSoon.length, cls: "bg-amber-50 text-amber-700", icon: Clock },
+  ];
+  const byArea = data.settings.complianceAreas.map((c) => ({ c, n: open.filter((t) => areaOf(t) === c).length })).filter((x) => x.n > 0);
+  const byStaff = data.staff.filter((s) => s.role === "Staff").map((s) => ({ s, n: data.tasks.filter((t) => t.staffId === s.id && t.status !== "Completed").length }));
+  const maxStaff = Math.max(1, ...byStaff.map((x) => x.n));
+  const upcoming = [...open].sort((a, b) => daysUntil(a.due) - daysUntil(b.due)).slice(0, 6);
+
+  return (
+    <div className="space-y-5">
+      <div>
+        <h1 className="text-lg font-semibold text-slate-800">{isAdmin ? "Firm overview" : `Hello, ${me.name}`}</h1>
+        <p className="text-sm text-slate-400">{isAdmin ? "Everything across the firm at a glance." : "Your assigned compliances and deadlines."}</p>
+      </div>
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        {stats.map((s) => { const Icon = s.icon; return (
+          <Card key={s.label} className="p-4">
+            <div className={`mb-3 inline-flex h-9 w-9 items-center justify-center rounded-xl ${s.cls}`}><Icon size={18} /></div>
+            <div className="text-2xl font-semibold text-slate-800">{s.val}</div>
+            <div className="text-xs text-slate-400">{s.label}</div>
+          </Card>); })}
+      </div>
+      <div className="grid gap-4 lg:grid-cols-2">
+        {isAdmin && (
+          <Card className="p-4">
+            <h2 className="mb-3 text-sm font-semibold text-slate-700">Open tasks per staff</h2>
+            <div className="space-y-2.5">
+              {byStaff.map(({ s, n }) => (
+                <div key={s.id} className="flex items-center gap-3">
+                  <div className="w-20 truncate text-sm text-slate-600">{s.name}</div>
+                  <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-indigo-300" style={{ width: `${(n / maxStaff) * 100}%` }} /></div>
+                  <div className="w-6 text-right text-sm font-medium text-slate-700">{n}</div>
+                </div>
+              ))}
+            </div>
+          </Card>
+        )}
+        <Card className="p-4">
+          <h2 className="mb-3 text-sm font-semibold text-slate-700">Open tasks by area</h2>
+          {byArea.length === 0 ? <p className="text-sm text-slate-400">No open tasks.</p> : (
+            <div className="flex flex-wrap gap-2">{byArea.map(({ c, n }) => <Chip key={c} cls={colorFor(c)}>{c} · {n}</Chip>)}</div>
+          )}
+        </Card>
+        <Card className={`p-4 ${isAdmin ? "lg:col-span-2" : ""}`}>
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-slate-700">Upcoming deadlines</h2>
+            <button onClick={() => setTab("tasks")} className="text-xs font-medium text-indigo-500 hover:underline">View all</button>
+          </div>
+          {upcoming.length === 0 ? <p className="text-sm text-slate-400">Nothing pending.</p> : (
+            <div className="divide-y divide-slate-100">
+              {upcoming.map((t) => { const d = daysUntil(t.due); return (
+                <div key={t.id} className="flex items-center gap-3 py-2.5">
+                  <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${U[urgency(t)].dot}`} />
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-sm font-medium text-slate-700">{titleOf(t)}</div>
+                    <div className="truncate text-xs text-slate-400">{clientName(t.clientId)} · {staffName(t.staffId)}</div>
+                  </div>
+                  <Chip cls={colorFor(areaOf(t))}>{areaOf(t)}</Chip>
+                  <div className="w-24 text-right text-xs text-slate-500">{fmt(t.due)}<br /><span className={d < 0 ? "text-rose-500" : "text-slate-400"}>{d < 0 ? `${-d}d overdue` : d === 0 ? "today" : `in ${d}d`}</span></div>
+                </div>); })}
+            </div>
+          )}
+        </Card>
+      </div>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Calendar                                                           */
+/* ------------------------------------------------------------------ */
+function Calendar({ visibleTasks, clientName, staffName, titleOf, areaOf }) {
+  const [view, setView] = useState(() => { const d = today(); return { y: d.getFullYear(), m: d.getMonth() }; });
+  const [sel, setSel] = useState(toISO(today()));
+  const startPad = new Date(view.y, view.m, 1).getDay();
+  const dim = new Date(view.y, view.m + 1, 0).getDate();
+  const cells = []; for (let i = 0; i < startPad; i++) cells.push(null); for (let d = 1; d <= dim; d++) cells.push(d);
+  const on = (d) => visibleTasks.filter((t) => t.due === `${view.y}-${pad(view.m + 1)}-${pad(d)}`);
+  const worst = (ts) => { const order = ["overdue", "due-soon", "upcoming", "completed"]; let b = null; ts.forEach((t) => { const u = urgency(t); if (b === null || order.indexOf(u) < order.indexOf(b)) b = u; }); return b; };
+  const selTasks = visibleTasks.filter((t) => t.due === sel).sort((a, b) => titleOf(a).localeCompare(titleOf(b)));
+  const move = (n) => { const d = new Date(view.y, view.m + n, 1); setView({ y: d.getFullYear(), m: d.getMonth() }); };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h1 className="text-lg font-semibold text-slate-800">Compliance calendar</h1>
+        <div className="flex flex-wrap gap-2">{Object.keys(U).map((k) => <span key={k} className="inline-flex items-center gap-1 text-xs text-slate-500"><span className={`h-2.5 w-2.5 rounded-full ${U[k].dot}`} /> {U[k].label}</span>)}</div>
+      </div>
+      <Card className="p-4">
+        <div className="mb-3 flex items-center justify-between">
+          <button onClick={() => move(-1)} className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100"><ChevronLeft size={18} /></button>
+          <div className="text-sm font-semibold text-slate-700">{MONTHS[view.m]} {view.y}</div>
+          <button onClick={() => move(1)} className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100"><ChevronRight size={18} /></button>
+        </div>
+        <div className="grid grid-cols-7 gap-1 text-center text-[11px] font-medium text-slate-400">{["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].map((d) => <div key={d} className="py-1">{d}</div>)}</div>
+        <div className="grid grid-cols-7 gap-1">
+          {cells.map((d, i) => {
+            if (d === null) return <div key={i} />;
+            const iso = `${view.y}-${pad(view.m + 1)}-${pad(d)}`; const ts = on(d); const u = ts.length ? worst(ts) : null;
+            const isToday = iso === toISO(today()); const isSel = iso === sel;
+            return (
+              <button key={i} onClick={() => setSel(iso)}
+                className={`flex aspect-square flex-col items-center justify-start rounded-xl border p-1 text-xs transition ${isSel ? "border-indigo-300 ring-2 ring-indigo-100" : "border-transparent hover:border-slate-200"} ${u ? U[u].chip : "text-slate-500"}`}>
+                <span className={`flex h-5 w-5 items-center justify-center rounded-full ${isToday ? "bg-indigo-500 text-white" : ""}`}>{d}</span>
+                {ts.length > 0 && <span className="mt-0.5 flex gap-0.5">{ts.slice(0, 3).map((t) => <span key={t.id} className={`h-1.5 w-1.5 rounded-full ${U[urgency(t)].dot}`} />)}</span>}
+              </button>
+            );
+          })}
+        </div>
+      </Card>
+      <Card className="p-4">
+        <h2 className="mb-2 text-sm font-semibold text-slate-700">{fmt(sel)}</h2>
+        {selTasks.length === 0 ? <p className="text-sm text-slate-400">No compliances on this day.</p> : (
+          <div className="divide-y divide-slate-100">
+            {selTasks.map((t) => (
+              <div key={t.id} className="flex items-center gap-3 py-2.5">
+                <span className={`h-2.5 w-2.5 rounded-full ${U[urgency(t)].dot}`} />
+                <div className="min-w-0 flex-1"><div className="truncate text-sm font-medium text-slate-700">{titleOf(t)}</div><div className="truncate text-xs text-slate-400">{clientName(t.clientId)} · {staffName(t.staffId)}</div></div>
+                <Chip cls={colorFor(areaOf(t))}>{areaOf(t)}</Chip>
+                <Chip cls={STATUS_STYLE[t.status]}>{t.status}</Chip>
+              </div>
+            ))}
+          </div>
+        )}
+      </Card>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Tasks  (Assignments  +  Task Master)                               */
+/* ------------------------------------------------------------------ */
+function Tasks({ isAdmin, data, visibleTasks, clientName, staffName, titleOf, areaOf, cycleStatus, delTask, setModal }) {
+  const [sub, setSub] = useState("assignments");
+  const [fStatus, setFStatus] = useState("All");
+  const [fArea, setFArea] = useState("All");
+  const [fStaff, setFStaff] = useState("All");
+  const [fMaster, setFMaster] = useState("All");
+
+  let list = [...visibleTasks];
+  if (fStatus !== "All") list = list.filter((t) => t.status === fStatus);
+  if (fArea !== "All") list = list.filter((t) => areaOf(t) === fArea);
+  if (fMaster !== "All") list = list.filter((t) => t.masterId === fMaster);
+  if (isAdmin && fStaff !== "All") list = list.filter((t) => t.staffId === fStaff);
+  list.sort((a, b) => parse(a.due) - parse(b.due));
+
+  const Sel = ({ value, onChange, children }) => (
+    <select value={value} onChange={(e) => onChange(e.target.value)} className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-200">{children}</select>
+  );
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="text-lg font-semibold text-slate-800">Tasks</h1>
+        {isAdmin && (
+          <div className="flex gap-2">
+            <button onClick={() => setModal({ type: "bulk" })} className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"><Upload size={16} /> Bulk import</button>
+            <button onClick={() => setModal({ type: "assign" })} className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-500 px-3 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-600"><Plus size={16} /> Assign task</button>
+          </div>
+        )}
+      </div>
+
+      {isAdmin && (
+        <div className="inline-flex rounded-xl border border-slate-200 bg-white p-1 text-sm">
+          {[["assignments", "Assignments", ListChecks], ["master", "Task Master", Layers]].map(([id, label, Icon]) => (
+            <button key={id} onClick={() => setSub(id)} className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 font-medium ${sub === id ? "bg-indigo-500 text-white" : "text-slate-500"}`}><Icon size={14} /> {label}</button>
+          ))}
+        </div>
+      )}
+
+      {sub === "assignments" ? (
+        <>
+          <div className="flex flex-wrap gap-2">
+            <Sel value={fStatus} onChange={setFStatus}><option>All</option>{STATUS.map((s) => <option key={s}>{s}</option>)}</Sel>
+            <Sel value={fArea} onChange={setFArea}><option value="All">All areas</option>{data.settings.complianceAreas.map((c) => <option key={c}>{c}</option>)}</Sel>
+            <Sel value={fMaster} onChange={setFMaster}><option value="All">All master tasks</option>{data.masters.map((m) => <option key={m.id} value={m.id}>{m.title}</option>)}</Sel>
+            {isAdmin && <Sel value={fStaff} onChange={setFStaff}><option value="All">All staff</option>{data.staff.filter((s) => s.role === "Staff").map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</Sel>}
+          </div>
+          <Card className="overflow-hidden">
+            {list.length === 0 ? <p className="p-6 text-center text-sm text-slate-400">No tasks match these filters.</p> : (
+              <div className="divide-y divide-slate-100">
+                {list.map((t) => { const d = daysUntil(t.due); return (
+                  <div key={t.id} className="flex flex-wrap items-center gap-3 p-3.5">
+                    <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${U[urgency(t)].dot}`} />
+                    <div className="min-w-0 flex-1"><div className="truncate text-sm font-medium text-slate-700">{titleOf(t)}</div><div className="truncate text-xs text-slate-400">{clientName(t.clientId)} · {staffName(t.staffId)}</div></div>
+                    <Chip cls={colorFor(areaOf(t))}>{areaOf(t)}</Chip>
+                    <div className="w-24 text-right text-xs text-slate-500">{fmt(t.due)}<br /><span className={t.status !== "Completed" && d < 0 ? "text-rose-500" : "text-slate-400"}>{t.status === "Completed" ? "done" : d < 0 ? `${-d}d overdue` : d === 0 ? "today" : `in ${d}d`}</span></div>
+                    <button onClick={() => cycleStatus(t)} title="Tap to change status"><Chip cls={STATUS_STYLE[t.status]}>{t.status === "Completed" ? <CheckCircle2 size={12} /> : null}{t.status}</Chip></button>
+                    {isAdmin && (
+                      <div className="flex gap-1">
+                        <button onClick={() => setModal({ type: "assign", payload: t })} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600"><Pencil size={15} /></button>
+                        <button onClick={() => delTask(t.id)} className="rounded-lg p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-500"><Trash2 size={15} /></button>
+                      </div>
+                    )}
+                  </div>); })}
+              </div>
+            )}
+          </Card>
+        </>
+      ) : (
+        <MasterList data={data} setModal={setModal} />
+      )}
+    </div>
+  );
+}
+
+function MasterList({ data, setModal }) {
+  const count = (id) => data.tasks.filter((t) => t.masterId === id).length;
+  return (
+    <div className="space-y-3">
+      <div className="flex justify-end">
+        <button onClick={() => setModal({ type: "master" })} className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-500 px-3 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-600"><Plus size={16} /> New master task</button>
+      </div>
+      <Card className="overflow-hidden">
+        <div className="divide-y divide-slate-100">
+          {data.masters.length === 0 && <p className="p-6 text-center text-sm text-slate-400">No master tasks yet.</p>}
+          {data.masters.map((m) => (
+            <div key={m.id} className="flex items-center gap-3 p-3.5">
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600"><Layers size={16} /></div>
+              <div className="min-w-0 flex-1"><div className="truncate text-sm font-medium text-slate-700">{m.title}</div><div className="text-xs text-slate-400">{count(m.id)} assignment(s)</div></div>
+              <Chip cls={colorFor(m.compliance)}>{m.compliance}</Chip>
+              <button onClick={() => setModal({ type: "master", payload: m })} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600"><Pencil size={15} /></button>
+            </div>
+          ))}
+        </div>
+      </Card>
+      <p className="text-xs text-slate-400">Editing a master task name or area updates it everywhere it's assigned.</p>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Clients                                                            */
+/* ------------------------------------------------------------------ */
+function Clients({ isAdmin, data, staffName, setModal, delClient }) {
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h1 className="text-lg font-semibold text-slate-800">Clients</h1>
+        {isAdmin && <button onClick={() => setModal({ type: "client" })} className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-500 px-3 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-600"><Plus size={16} /> New client</button>}
+      </div>
+      <Card className="overflow-hidden">
+        <div className="divide-y divide-slate-100">
+          {data.clients.map((c) => (
+            <div key={c.id} className="flex items-center gap-3 p-3.5">
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600"><Building2 size={16} /></div>
+              <div className="min-w-0 flex-1"><div className="truncate text-sm font-medium text-slate-700">{c.name}</div><div className="truncate text-xs text-slate-400">{c.type} · {staffName(c.staffId)}</div></div>
+              <Chip cls={c.status === "Active" ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-slate-100 text-slate-500 border-slate-200"}>{c.status}</Chip>
+              {isAdmin ? (
+                <div className="flex gap-1">
+                  <button onClick={() => setModal({ type: "client", payload: c })} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600"><Pencil size={15} /></button>
+                  <button onClick={() => delClient(c.id)} className="rounded-lg p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-500"><Trash2 size={15} /></button>
+                </div>
+              ) : <span className="text-slate-300"><Eye size={15} /></span>}
+            </div>
+          ))}
+        </div>
+      </Card>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Team                                                               */
+/* ------------------------------------------------------------------ */
+function Team({ data, save }) {
+  const [name, setName] = useState("");
+  const add = () => { if (!name.trim()) return; save({ ...data, staff: [...data.staff, { id: uid(), name: name.trim(), role: "Staff" }] }); setName(""); };
+  const remove = (id) => save({ ...data, staff: data.staff.filter((s) => s.id !== id), tasks: data.tasks.map((t) => (t.staffId === id ? { ...t, staffId: "" } : t)), clients: data.clients.map((c) => (c.staffId === id ? { ...c, staffId: "" } : c)) });
+  return (
+    <div className="space-y-4">
+      <h1 className="text-lg font-semibold text-slate-800">Team</h1>
+      <Card className="p-4"><div className="flex gap-2"><input value={name} onChange={(e) => setName(e.target.value)} placeholder="Add staff member" className={inputCls} /><button onClick={add} className="rounded-xl bg-indigo-500 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-600">Add</button></div></Card>
+      <Card className="overflow-hidden"><div className="divide-y divide-slate-100">{data.staff.map((s) => (
+        <div key={s.id} className="flex items-center gap-3 p-3.5">
+          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-indigo-50 text-sm font-semibold text-indigo-600">{s.name.slice(0, 1)}</div>
+          <div className="flex-1"><div className="text-sm font-medium text-slate-700">{s.name}</div><div className="text-xs text-slate-400">{s.role}</div></div>
+          {s.role !== "Admin" && <button onClick={() => remove(s.id)} className="rounded-lg p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-500"><Trash2 size={15} /></button>}
+        </div>
+      ))}</div></Card>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Settings                                                           */
+/* ------------------------------------------------------------------ */
+const LEAD_PRESETS = [1, 2, 3, 5, 7, 10, 14, 30];
+function SettingsPanel({ data, save }) {
+  const s = data.settings;
+  const setS = (patch) => save({ ...data, settings: { ...s, ...patch } });
+  const [firm, setFirm] = useState(s.firmName);
+  const [newArea, setNewArea] = useState("");
+  const toggleLead = (n) => { const has = s.reminderDays.includes(n); setS({ reminderDays: has ? s.reminderDays.filter((x) => x !== n) : [...s.reminderDays, n].sort((a, b) => a - b) }); };
+  const addArea = () => { const a = newArea.trim(); if (!a || s.complianceAreas.includes(a)) return; setS({ complianceAreas: [...s.complianceAreas, a] }); setNewArea(""); };
+  const removeArea = (a) => setS({ complianceAreas: s.complianceAreas.filter((x) => x !== a) });
+  const Section = ({ icon: Icon, children, hint }) => (<div className="mb-3"><div className="flex items-center gap-2 text-sm font-semibold text-slate-700"><Icon size={15} className="text-indigo-400" /> {children}</div>{hint && <p className="mt-0.5 text-xs text-slate-400">{hint}</p>}</div>);
+  return (
+    <div className="space-y-4">
+      <div><h1 className="text-lg font-semibold text-slate-800">Settings</h1><p className="text-sm text-slate-400">Admin controls for the whole firm. Staff don't see this tab.</p></div>
+      <Card className="p-4"><Section icon={Building2}>Firm name</Section><div className="flex gap-2"><input value={firm} onChange={(e) => setFirm(e.target.value)} className={inputCls} /><button onClick={() => setS({ firmName: firm.trim() || s.firmName })} className="rounded-xl bg-indigo-500 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-600">Save</button></div></Card>
+      <Card className="p-4">
+        <Section icon={BellRing} hint="Drives the bell. A task surfaces as a reminder on these lead days, on its due date, and while overdue.">Reminder timings</Section>
+        <div className="mb-1 text-xs font-medium text-slate-500">Remind before due date</div>
+        <div className="mb-4 flex flex-wrap gap-2">{LEAD_PRESETS.map((n) => { const on = s.reminderDays.includes(n); return <button key={n} onClick={() => toggleLead(n)} className={`rounded-full border px-3 py-1 text-sm font-medium transition ${on ? "border-indigo-300 bg-indigo-50 text-indigo-700" : "border-slate-200 bg-white text-slate-500 hover:bg-slate-50"}`}>{n} day{n > 1 ? "s" : ""}</button>; })}</div>
+        <div className="space-y-2">
+          <Toggle label="Remind on the due date" on={s.remindOnDueDate} onClick={() => setS({ remindOnDueDate: !s.remindOnDueDate })} />
+          <Toggle label="Keep reminding while overdue" on={s.remindOverdue} onClick={() => setS({ remindOverdue: !s.remindOverdue })} />
+        </div>
+      </Card>
+      <Card className="p-4">
+        <Section icon={Tags} hint="Categories available on master tasks.">Compliance areas</Section>
+        <div className="mb-3 flex flex-wrap gap-2">{s.complianceAreas.map((a) => <span key={a} className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium ${colorFor(a)}`}>{a}<button onClick={() => removeArea(a)} className="rounded-full hover:bg-white/60"><X size={12} /></button></span>)}</div>
+        <div className="flex gap-2"><input value={newArea} onChange={(e) => setNewArea(e.target.value)} className={inputCls} placeholder="Add area, e.g. PF / ESI, PT, Customs" /><button onClick={addArea} className="rounded-xl bg-indigo-500 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-600">Add</button></div>
+      </Card>
+    </div>
+  );
+}
+function Toggle({ label, on, onClick }) {
+  return (<button onClick={onClick} className="flex w-full items-center justify-between rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-600 hover:bg-slate-50"><span>{label}</span><span className={`relative h-5 w-9 rounded-full transition ${on ? "bg-indigo-400" : "bg-slate-200"}`}><span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition ${on ? "left-4" : "left-0.5"}`} /></span></button>);
+}
+
+/* ------------------------------------------------------------------ */
+/*  Modal shell                                                        */
+/* ------------------------------------------------------------------ */
+function Modal({ title, onClose, children, wide }) {
+  return (
+    <div className="fixed inset-0 z-30 flex items-end justify-center bg-slate-900/30 p-0 sm:items-center sm:p-4" onClick={onClose}>
+      <div className={`w-full ${wide ? "max-w-lg" : "max-w-md"} max-h-[90vh] overflow-y-auto rounded-t-3xl border border-slate-200 bg-white p-5 shadow-xl sm:rounded-3xl`} onClick={(e) => e.stopPropagation()}>
+        <div className="mb-4 flex items-center justify-between"><h3 className="text-sm font-semibold text-slate-800">{title}</h3><button onClick={onClose} className="rounded-lg p-1 text-slate-400 hover:bg-slate-100"><X size={18} /></button></div>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Assign task  (one master → many companies → a person each)         */
+/* ------------------------------------------------------------------ */
+function AssignModal({ data, task, onAdd, onUpdate, onClose }) {
+  const editing = !!task;
+  const staffOptions = data.staff.filter((s) => s.role === "Staff");
+
+  /* edit mode = single existing assignment */
+  if (editing) {
+    return <EditAssignment data={data} task={task} onUpdate={onUpdate} onClose={onClose} />;
+  }
+
+  const [masterId, setMasterId] = useState(data.masters[0]?.id || "");
+  const [due, setDue] = useState(toISO(today()));
+  const [rows, setRows] = useState(() => {
+    const o = {}; data.clients.forEach((c) => { o[c.id] = { checked: false, staffId: c.staffId || staffOptions[0]?.id || "" }; }); return o;
+  });
+  const setRow = (id, patch) => setRows((p) => ({ ...p, [id]: { ...p[id], ...patch } }));
+  const allChecked = data.clients.length > 0 && data.clients.every((c) => rows[c.id].checked);
+  const toggleAll = () => { const v = !allChecked; setRows((p) => { const n = { ...p }; data.clients.forEach((c) => { n[c.id] = { ...n[c.id], checked: v }; }); return n; }); };
+  const chosen = data.clients.filter((c) => rows[c.id].checked);
+  const valid = masterId && due && chosen.length > 0;
+
+  const create = () => {
+    if (!valid) return;
+    onAdd(chosen.map((c) => ({ masterId, clientId: c.id, staffId: rows[c.id].staffId, due, status: "Pending" })));
+    onClose();
+  };
+
+  return (
+    <Modal title="Assign task across companies" onClose={onClose} wide>
+      <div className="space-y-3">
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Master task">
+            <select className={inputCls} value={masterId} onChange={(e) => setMasterId(e.target.value)}>
+              {data.masters.map((m) => <option key={m.id} value={m.id}>{m.title}</option>)}
+            </select>
+          </Field>
+          <Field label="Due date"><input type="date" className={inputCls} value={due} onChange={(e) => setDue(e.target.value)} /></Field>
+        </div>
+        <div className="flex items-center justify-between">
+          <span className="text-xs font-medium text-slate-500">Companies &amp; who handles each</span>
+          <button onClick={toggleAll} className="inline-flex items-center gap-1 text-xs font-medium text-indigo-500">{allChecked ? <CheckSquare size={14} /> : <Square size={14} />} Select all</button>
+        </div>
+        <div className="max-h-64 space-y-1.5 overflow-y-auto rounded-xl border border-slate-200 p-2">
+          {data.clients.map((c) => {
+            const r = rows[c.id];
+            return (
+              <div key={c.id} className={`flex items-center gap-2 rounded-lg p-2 ${r.checked ? "bg-indigo-50/60" : ""}`}>
+                <button onClick={() => setRow(c.id, { checked: !r.checked })} className="text-indigo-500">{r.checked ? <CheckSquare size={18} /> : <Square size={18} className="text-slate-300" />}</button>
+                <div className="min-w-0 flex-1 truncate text-sm text-slate-700">{c.name}</div>
+                <select disabled={!r.checked} value={r.staffId} onChange={(e) => setRow(c.id, { staffId: e.target.value })}
+                  className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs text-slate-600 disabled:opacity-40 focus:outline-none focus:ring-2 focus:ring-indigo-200">
+                  {staffOptions.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                </select>
+              </div>
+            );
+          })}
+        </div>
+        <div className="flex gap-2 pt-1">
+          <button onClick={onClose} className="flex-1 rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50">Cancel</button>
+          <button onClick={create} disabled={!valid} className="flex-1 rounded-xl bg-indigo-500 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-600 disabled:opacity-40">Create {chosen.length || ""} assignment{chosen.length === 1 ? "" : "s"}</button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+function EditAssignment({ data, task, onUpdate, onClose }) {
+  const staffOptions = data.staff.filter((s) => s.role === "Staff");
+  const m = data.masters.find((x) => x.id === task.masterId);
+  const [f, setF] = useState({ ...task });
+  const set = (k, v) => setF((p) => ({ ...p, [k]: v }));
+  return (
+    <Modal title="Edit assignment" onClose={onClose}>
+      <div className="space-y-3">
+        <div className="rounded-xl bg-slate-50 px-3 py-2 text-sm"><span className="font-medium text-slate-700">{m?.title}</span> <Chip cls={colorFor(m?.compliance)}>{m?.compliance}</Chip><p className="mt-1 text-xs text-slate-400">Rename in Task Master to change everywhere.</p></div>
+        <Field label="Company"><select className={inputCls} value={f.clientId} onChange={(e) => set("clientId", e.target.value)}>{data.clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></Field>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Assigned to"><select className={inputCls} value={f.staffId} onChange={(e) => set("staffId", e.target.value)}>{staffOptions.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</select></Field>
+          <Field label="Due date"><input type="date" className={inputCls} value={f.due} onChange={(e) => set("due", e.target.value)} /></Field>
+        </div>
+        <Field label="Status"><select className={inputCls} value={f.status} onChange={(e) => set("status", e.target.value)}>{STATUS.map((s) => <option key={s}>{s}</option>)}</select></Field>
+        <div className="flex gap-2 pt-1">
+          <button onClick={onClose} className="flex-1 rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50">Cancel</button>
+          <button onClick={() => { onUpdate(f); onClose(); }} className="flex-1 rounded-xl bg-indigo-500 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-600">Save changes</button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Master task modal                                                  */
+/* ------------------------------------------------------------------ */
+function MasterModal({ data, master, save, onClose }) {
+  const [title, setTitle] = useState(master?.title || "");
+  const [area, setArea] = useState(master?.compliance || data.settings.complianceAreas[0] || "");
+  const inUse = master ? data.tasks.filter((t) => t.masterId === master.id).length : 0;
+  const submit = () => {
+    if (!title.trim()) return;
+    if (master) save({ ...data, masters: data.masters.map((m) => (m.id === master.id ? { ...m, title: title.trim(), compliance: area } : m)) });
+    else save({ ...data, masters: [...data.masters, { id: uid(), title: title.trim(), compliance: area }] });
+    onClose();
+  };
+  const remove = () => {
+    save({ ...data, masters: data.masters.filter((m) => m.id !== master.id), tasks: data.tasks.filter((t) => t.masterId !== master.id) });
+    onClose();
+  };
+  return (
+    <Modal title={master ? "Edit master task" : "New master task"} onClose={onClose}>
+      <div className="space-y-3">
+        <Field label="Task name"><input className={inputCls} value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. GSTR-3B filing" /></Field>
+        <Field label="Area"><select className={inputCls} value={area} onChange={(e) => setArea(e.target.value)}>{data.settings.complianceAreas.map((c) => <option key={c}>{c}</option>)}</select></Field>
+        <div className="flex gap-2 pt-1">
+          {master && <button onClick={remove} className="rounded-xl border border-rose-200 px-3 py-2 text-sm font-medium text-rose-600 hover:bg-rose-50" title={`Removes this master and its ${inUse} assignment(s)`}><Trash2 size={15} /></button>}
+          <button onClick={onClose} className="flex-1 rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50">Cancel</button>
+          <button onClick={submit} disabled={!title.trim()} className="flex-1 rounded-xl bg-indigo-500 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-600 disabled:opacity-40">{master ? "Save" : "Create"}</button>
+        </div>
+        {master && inUse > 0 && <p className="text-xs text-slate-400">Deleting also removes its {inUse} assignment(s).</p>}
+      </div>
+    </Modal>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Client modal                                                       */
+/* ------------------------------------------------------------------ */
+function ClientModal({ client, data, onSave, onClose }) {
+  const staffOptions = data.staff.filter((s) => s.role === "Staff");
+  const [f, setF] = useState({ id: client?.id, name: client?.name || "", type: client?.type || "Pvt Ltd", staffId: client?.staffId || staffOptions[0]?.id || "", status: client?.status || "Active" });
+  const set = (k, v) => setF((p) => ({ ...p, [k]: v }));
+  const TYPES = ["Proprietorship", "Partnership", "LLP", "Pvt Ltd", "Public Ltd", "Foreign Subsidiary", "Trust", "HUF", "Individual"];
+  return (
+    <Modal title={client ? "Edit client" : "New client"} onClose={onClose}>
+      <div className="space-y-3">
+        <Field label="Client name"><input className={inputCls} value={f.name} onChange={(e) => set("name", e.target.value)} placeholder="e.g. ABC India Pvt Ltd" /></Field>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Entity type"><select className={inputCls} value={f.type} onChange={(e) => set("type", e.target.value)}>{TYPES.map((t) => <option key={t}>{t}</option>)}</select></Field>
+          <Field label="Status"><select className={inputCls} value={f.status} onChange={(e) => set("status", e.target.value)}><option>Active</option><option>Inactive</option></select></Field>
+        </div>
+        <Field label="Responsible staff"><select className={inputCls} value={f.staffId} onChange={(e) => set("staffId", e.target.value)}>{staffOptions.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</select></Field>
+        <div className="flex gap-2 pt-1">
+          <button onClick={onClose} className="flex-1 rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50">Cancel</button>
+          <button onClick={() => f.name.trim() && onSave(f)} disabled={!f.name.trim()} className="flex-1 rounded-xl bg-indigo-500 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-600 disabled:opacity-40">{client ? "Save changes" : "Add client"}</button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Bulk import / update  (paste or CSV → upsert)                      */
+/* ------------------------------------------------------------------ */
+function BulkImport({ data, onApply, onClose }) {
+  const [text, setText] = useState("");
+  const [rows, setRows] = useState(null); // parsed preview
+  const sample = "Task, Area, Client, Assignee, Due, Status\nGSTR-3B filing, GST, ABC India Pvt Ltd, Priya, 20-06-2026, Pending\nGSTR-3B filing, GST, DEF Trading LLP, Sneha, 20-06-2026, Pending";
+
+  const lc = (s) => (s || "").trim().toLowerCase();
+  const findStaff = (name) => data.staff.find((s) => s.role === "Staff" && lc(s.name) === lc(name));
+  const findClient = (name) => data.clients.find((c) => lc(c.name) === lc(name));
+  const findStatus = (s) => STATUS.find((x) => lc(x) === lc(s));
+
+  const parseText = () => {
+    const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+    const pendingMasters = {}; // lc title -> master obj (new)
+    const out = [];
+    lines.forEach((line, i) => {
+      const cols = (line.includes("\t") ? line.split("\t") : line.split(",")).map((c) => c.trim());
+      if (i === 0 && lc(cols[0]) === "task" && cols.some((c) => lc(c) === "client")) return; // header
+      const [task, area, clientName, assignee, dueRaw, statusRaw] = cols;
+      const row = { raw: line };
+      if (!task || !clientName) { out.push({ ...row, error: "Task and Client are required" }); return; }
+      const client = findClient(clientName);
+      if (!client) { out.push({ ...row, error: `Unknown client "${clientName}"` }); return; }
+      let staff = assignee ? findStaff(assignee) : data.staff.find((s) => s.id === client.staffId);
+      if (assignee && !staff) { out.push({ ...row, error: `Unknown staff "${assignee}"` }); return; }
+      if (!staff) { out.push({ ...row, error: "No assignee and client has no responsible staff" }); return; }
+      const due = importDate(dueRaw);
+      if (!due) { out.push({ ...row, error: `Bad date "${dueRaw}" (use YYYY-MM-DD or DD-MM-YYYY)` }); return; }
+      const status = findStatus(statusRaw) || "Pending";
+      let m = data.masters.find((x) => lc(x.title) === lc(task));
+      let newMaster = false;
+      if (!m) {
+        const key = lc(task);
+        if (pendingMasters[key]) m = pendingMasters[key];
+        else { const validArea = data.settings.complianceAreas.find((a) => lc(a) === lc(area)) || area || data.settings.complianceAreas[0]; m = { id: uid(), title: task, compliance: validArea }; pendingMasters[key] = m; newMaster = true; }
+      }
+      const existing = data.tasks.find((t) => t.masterId === m.id && t.clientId === client.id);
+      out.push({ ...row, ok: true, mode: existing ? "update" : "create", newMaster, masterId: m.id, existingId: existing?.id, clientId: client.id, staffId: staff.id, due, status, label: `${task} · ${client.name} → ${staff.name}` });
+    });
+    setRows({ list: out, newMasters: Object.values(pendingMasters) });
+  };
+
+  const apply = () => {
+    if (!rows) return;
+    const ok = rows.list.filter((r) => r.ok);
+    let tasks = [...data.tasks];
+    ok.forEach((r) => {
+      if (r.mode === "update") tasks = tasks.map((t) => (t.id === r.existingId ? { ...t, staffId: r.staffId, due: r.due, status: r.status } : t));
+      else tasks.push({ id: uid(), masterId: r.masterId, clientId: r.clientId, staffId: r.staffId, due: r.due, status: r.status });
+    });
+    onApply(rows.newMasters, tasks);
+    onClose();
+  };
+
+  const onFile = (e) => { const f = e.target.files?.[0]; if (!f) return; const reader = new FileReader(); reader.onload = () => setText(String(reader.result || "")); reader.readAsText(f); };
+
+  const okCount = rows ? rows.list.filter((r) => r.ok).length : 0;
+  const created = rows ? rows.list.filter((r) => r.ok && r.mode === "create").length : 0;
+  const updated = rows ? rows.list.filter((r) => r.ok && r.mode === "update").length : 0;
+  const errs = rows ? rows.list.filter((r) => !r.ok) : [];
+
+  return (
+    <Modal title="Bulk import / update" onClose={onClose} wide>
+      {!rows ? (
+        <div className="space-y-3">
+          <p className="text-xs text-slate-500">Paste rows or upload a CSV. Columns: <span className="font-medium">Task, Area, Client, Assignee, Due, Status</span>. Matching by name. Existing Task+Client pairs are <span className="font-medium">updated</span>; new ones are <span className="font-medium">created</span>. Assignee blank = client's responsible staff.</p>
+          <textarea value={text} onChange={(e) => setText(e.target.value)} rows={8} placeholder={sample} className={`${inputCls} font-mono text-xs`} />
+          <div className="flex flex-wrap items-center gap-2">
+            <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl border border-slate-200 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"><Upload size={15} /> Upload CSV<input type="file" accept=".csv,text/csv,text/plain" onChange={onFile} className="hidden" /></label>
+            <button onClick={() => setText(sample)} className="rounded-xl px-3 py-2 text-sm font-medium text-indigo-500 hover:bg-indigo-50">Insert sample</button>
+            <div className="ml-auto flex gap-2">
+              <button onClick={onClose} className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50">Cancel</button>
+              <button onClick={parseText} disabled={!text.trim()} className="rounded-xl bg-indigo-500 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-600 disabled:opacity-40">Preview</button>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          <div className="flex flex-wrap gap-2 text-xs">
+            <Chip cls="bg-emerald-50 text-emerald-700 border-emerald-200">{created} to create</Chip>
+            <Chip cls="bg-indigo-50 text-indigo-700 border-indigo-200">{updated} to update</Chip>
+            {rows.newMasters.length > 0 && <Chip cls="bg-violet-50 text-violet-700 border-violet-200">{rows.newMasters.length} new master(s)</Chip>}
+            {errs.length > 0 && <Chip cls="bg-rose-50 text-rose-700 border-rose-200">{errs.length} error(s)</Chip>}
+          </div>
+          <div className="max-h-72 space-y-1 overflow-y-auto rounded-xl border border-slate-200 p-2">
+            {rows.list.map((r, i) => (
+              <div key={i} className={`flex items-start gap-2 rounded-lg px-2 py-1.5 text-xs ${r.ok ? "" : "bg-rose-50"}`}>
+                {r.ok ? <CheckCircle2 size={14} className="mt-0.5 shrink-0 text-emerald-500" /> : <AlertTriangle size={14} className="mt-0.5 shrink-0 text-rose-500" />}
+                <div className="min-w-0">
+                  {r.ok ? <span className="text-slate-700">{r.label} · {fmt(r.due)} · <span className="text-slate-400">{r.mode}{r.newMaster ? " (new master)" : ""}</span></span>
+                        : <span className="text-rose-600">{r.error} — <span className="text-rose-400">{r.raw}</span></span>}
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="flex gap-2">
+            <button onClick={() => setRows(null)} className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50">Back</button>
+            <button onClick={apply} disabled={okCount === 0} className="ml-auto rounded-xl bg-indigo-500 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-600 disabled:opacity-40">Apply {okCount} row{okCount === 1 ? "" : "s"}</button>
+          </div>
+        </div>
+      )}
+    </Modal>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(PracticeDesk));
+
+</script>
+</body>
+</html>
